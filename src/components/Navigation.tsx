@@ -16,6 +16,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { id: 'home', label: 'Home', path: '/', icon: <Brain className="w-5 h-5" /> },
+  { id: 'app', label: 'Research App', path: '/app', icon: <Zap className="w-5 h-5" /> },
   { 
     id: 'demo', 
     label: 'Live Demo', 

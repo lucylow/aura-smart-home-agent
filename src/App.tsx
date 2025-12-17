@@ -14,6 +14,7 @@ import Literature from "./pages/agents/Literature";
 import Hypothesis from "./pages/agents/Hypothesis";
 import Docs from "./pages/Docs";
 import Api from "./pages/Api";
+import MemoriaApp from "./pages/MemoriaApp";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const App = () => (
           <Route path="/agents/hypothesis" element={<Hypothesis />} />
           <Route path="/docs" element={<Docs />} />
           <Route path="/api" element={<Api />} />
+          <Route path="/app" element={<MemoriaApp />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
