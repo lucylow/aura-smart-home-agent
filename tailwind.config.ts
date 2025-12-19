@@ -15,6 +15,7 @@ export default {
     extend: {
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        heading: ['Poppins', 'Inter', 'system-ui', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -65,6 +66,19 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // Semantic AURA colors
+        slate: {
+          DEFAULT: "hsl(210 62% 15%)",
+          light: "hsl(210 62% 25%)",
+        },
+        teal: {
+          DEFAULT: "hsl(175 100% 38%)",
+          dark: "hsl(175 100% 32%)",
+        },
+        coral: {
+          DEFAULT: "hsl(6 100% 68%)",
+          dark: "hsl(6 100% 58%)",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -73,6 +87,10 @@ export default {
         xl: "calc(var(--radius) + 4px)",
         "2xl": "calc(var(--radius) + 8px)",
         "3xl": "calc(var(--radius) + 16px)",
+      },
+      spacing: {
+        '18': '4.5rem',
+        '88': '22rem',
       },
       keyframes: {
         "accordion-down": {
@@ -133,6 +151,15 @@ export default {
           "0%": { transform: "scale(0.95)", opacity: "0" },
           "100%": { transform: "scale(1)", opacity: "1" },
         },
+        "flow-line": {
+          "0%": { strokeDashoffset: "100" },
+          "100%": { strokeDashoffset: "0" },
+        },
+        "device-activate": {
+          "0%": { transform: "scale(1)", boxShadow: "0 0 0 0 hsl(var(--success) / 0)" },
+          "50%": { transform: "scale(1.05)", boxShadow: "0 0 20px 4px hsl(var(--success) / 0.4)" },
+          "100%": { transform: "scale(1)", boxShadow: "0 0 0 0 hsl(var(--success) / 0)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -148,6 +175,8 @@ export default {
         "spin-slow": "spin-slow 20s linear infinite",
         bounce: "bounce 1s infinite",
         "scale-in": "scale-in 0.3s ease-out",
+        "flow-line": "flow-line 2s ease-in-out infinite",
+        "device-activate": "device-activate 0.6s ease-out",
       },
       transitionDuration: {
         "400": "400ms",
