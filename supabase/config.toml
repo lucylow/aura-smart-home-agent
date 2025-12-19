@@ -2,3 +2,6 @@ project_id = "cddkoaeipwtumoqgvdfz"
 
 [functions.tuya-devices]
 verify_jwt = false
+
+[functions.aura-orchestrator]
+verify_jwt = false
