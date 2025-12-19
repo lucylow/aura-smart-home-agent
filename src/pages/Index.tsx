@@ -1,9 +1,9 @@
 import Header from "@/components/Header";
 import Hero from "@/components/Hero";
-import ProblemSolution from "@/components/ProblemSolution";
+import HowItWorks from "@/components/HowItWorks";
+import FeatureTiles from "@/components/FeatureTiles";
+import TryItSection from "@/components/TryItSection";
 import Architecture from "@/components/Architecture";
-import InteractiveDemo from "@/components/InteractiveDemo";
-import Features from "@/components/Features";
 import Footer from "@/components/Footer";
 
 const Index = () => {
@@ -12,10 +12,10 @@ const Index = () => {
       <Header />
       <main>
         <Hero />
-        <ProblemSolution />
+        <HowItWorks />
+        <FeatureTiles />
+        <TryItSection />
         <Architecture />
-        <InteractiveDemo />
-        <Features />
       </main>
       <Footer />
     </div>
