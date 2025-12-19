@@ -1,0 +1,4 @@
+project_id = "cddkoaeipwtumoqgvdfz"
+
+[functions.tuya-devices]
+verify_jwt = false
