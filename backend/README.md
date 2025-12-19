@@ -1,6 +1,50 @@
-# A.U.R.A. Backend
+# A.U.R.A. Backend - Smart Home Executive AI Agent
 
-Minimal Node.js TypeScript backend for the A.U.R.A. smart home automation system. Features a planner/executor flow with mocked Tuya integration, JWT authentication, and WebSocket device status updates.
+**A.U.R.A.** (Autonomous Unified Residential Assistant) is a cloud-based smart home orchestrator that uses a multi-agent architecture to intelligently control Tuya-powered IoT devices. Built for the Tuya AI Innovators Hackathon 2025.
+
+## Overview
+
+The A.U.R.A. backend implements an **Orchestrator-Specialist** multi-agent pattern that translates high-level natural language goals into coordinated device actions across your smart home.
+
+### Key Features
+
+- **Multi-Agent Architecture**: Orchestrator coordinates specialized agents (Security, Ambiance, Energy)
+- **Tuya Integration**: Native support for TuyaOpen/TuyaOS devices via Tuya Cloud APIs
+- **Context-Aware**: Adapts plans based on time, weather, occupancy, and environmental conditions
+- **LLM-Powered**: Natural language intent parsing and dynamic plan generation
+- **Demo & Live Modes**: Mock devices for demos or real Tuya device control
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                  OrchestratorAgent                      │
+│  • Receives natural language goals                     │
+│  • Classifies intent using LLM                         │
+│  • Generates multi-step execution plans                │
+│  • Applies context-based adjustments                   │
+└────────────────┬────────────────────────────────────────┘
+                 │
+        ┌────────┴────────┬────────────────┐
+        │                 │                │
+┌───────▼──────┐  ┌──────▼──────┐  ┌─────▼────────┐
+│  Security    │  │  Ambiance   │  │   Energy     │
+│  Specialist  │  │  Specialist │  │  Specialist  │
+│              │  │             │  │              │
+│ • Locks      │  │ • Lights    │  │ • Thermostat │
+│ • Sensors    │  │ • Blinds    │  │ • Power mgmt │
+│ • Alarms     │  │ • Media     │  │ • Eco modes  │
+└──────┬───────┘  └──────┬──────┘  └──────┬───────┘
+       │                 │                │
+       └─────────────────┴────────────────┘
+                         │
+                ┌────────▼─────────┐
+                │   TuyaService    │
+                │  • Device mgmt   │
+                │  • Command exec  │
+                │  • Live/Demo     │
+                └──────────────────┘
+```
 
 ## Quick Start
 
@@ -13,86 +57,144 @@ npm run dev
 
 Server runs on `http://localhost:3000` by default.
 
-## Environment Variables
+## Configuration
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` | Server port | `3000` |
-| `JWT_SECRET` | Secret for JWT signing | `devsecret` |
-| `NODE_ENV` | Environment mode | `development` |
-| `TUYA_CLIENT_ID` | Tuya API client ID (placeholder) | `placeholder` |
-| `TUYA_CLIENT_SECRET` | Tuya API secret (placeholder) | `placeholder` |
+### Environment Variables
+
+See `.env.example` for all configuration options:
+
+#### Operating Modes
+
+- **Demo Mode** (`MODE=demo`, `TUYA_MOCK=true`): Uses mock devices, no real Tuya account needed
+- **Live Mode** (`MODE=production`, `TUYA_MOCK=false`): Controls real Tuya devices
+
+#### Tuya Configuration
+
+For live mode, obtain credentials from [Tuya IoT Platform](https://iot.tuya.com/cloud/):
+
+```env
+TUYA_CLIENT_ID=your_client_id
+TUYA_CLIENT_SECRET=your_client_secret
+TUYA_REGION=us  # or eu, cn, in
+TUYA_ACCESS_URL=https://openapi.tuyaus.com
+```
+
+#### LLM Configuration
+
+```env
+LLM_PROVIDER=rule-based  # or openai, groq, anthropic
+LLM_API_KEY=your_api_key
+LLM_MODEL=gpt-4
+```
 
 ## API Endpoints
 
-### Health Check
-```bash
-curl http://localhost:3000/api/health
+### New AURA Endpoints
+
+#### POST `/api/aura/goal`
+Submit a natural language goal and receive an execution plan.
+
+**Request**:
+```json
+{
+  "text": "Movie time in the living room",
+  "userId": "demo-user-1"
+}
 ```
 
-### Login (get JWT token)
+**Response**:
+```json
+{
+  "ok": true,
+  "planId": "plan_1234567890_abc123",
+  "plan": {
+    "goal": "Movie time in the living room",
+    "goalType": "movie_time",
+    "steps": [
+      {
+        "specialist": "AmbianceSpecialist",
+        "action": "set_scene",
+        "params": { "lights": "dim", "brightness": 20 }
+      }
+    ]
+  }
+}
+```
+
+#### POST `/api/aura/plan/:planId/execute`
+Execute a stored plan.
+
+#### GET `/api/aura/plan/:planId`
+Get plan details and execution status.
+
+#### GET `/api/aura/devices`
+List all available devices.
+
+#### GET `/api/aura/status`
+Get system status and agent readiness.
+
+### Legacy Endpoints
+
+The original `/api/plan` and `/api/execute` endpoints remain available for backward compatibility.
+
+## Demo Scenarios
+
+### 1. Movie Time
 ```bash
-curl -X POST http://localhost:3000/api/auth/login \
+curl -X POST http://localhost:3000/api/aura/goal \
   -H "Content-Type: application/json" \
-  -d '{"username":"demo"}'
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{"text": "Movie time", "userId": "demo-user"}'
 ```
 
-### Create Plan
+**Expected behavior**: Dim lights, close blinds, optimize energy, lock doors
+
+### 2. Goodnight
 ```bash
-curl -X POST http://localhost:3000/api/plan \
-  -H "Authorization: Bearer <token>" \
+curl -X POST http://localhost:3000/api/aura/goal \
   -H "Content-Type: application/json" \
-  -d '{"userId":"U123","goal":"goodnight"}'
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{"text": "Goodnight", "userId": "demo-user"}'
 ```
 
-### Execute Plan
+**Expected behavior**: Turn off main lights, enable night lights, arm security, adjust thermostat
+
+### 3. Leaving Home
 ```bash
-curl -X POST http://localhost:3000/api/execute \
-  -H "Authorization: Bearer <token>" \
+curl -X POST http://localhost:3000/api/aura/goal \
   -H "Content-Type: application/json" \
-  -d '{"userId":"U123","plan":{"name":"Goodnight Routine","steps":[{"deviceHint":"Bedroom Light","action":"turnOff","description":"Turn off the bedroom light"}],"requiresConfirmation":true}}'
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{"text": "Leaving home", "userId": "demo-user"}'
 ```
 
-### Execute Plan (Dry Run)
-Preview execution without touching devices using `?dryRun=true` or `{ "dryRun": true }` in body:
-```bash
-curl -X POST "http://localhost:3000/api/execute?dryRun=true" \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{"userId":"U123","plan":{"name":"Test","steps":[{"deviceHint":"Bedroom Light","action":"turnOff","description":"Turn off light"}]}}'
+**Expected behavior**: Turn off all devices, eco mode, lock all doors, arm full security
+
+## Project Structure
+
 ```
-Returns `simulated: true` for each step without calling TuyaService.
-
-### Get Suggestions
-```bash
-curl http://localhost:3000/api/suggestions?homeId=H1
-```
-
-## WebSocket
-
-Connect to the server using Socket.IO to receive real-time device status updates:
-
-```javascript
-import { io } from 'socket.io-client';
-
-const socket = io('http://localhost:3000');
-
-socket.on('device_status_update', (data) => {
-  console.log('Device updated:', data.deviceId, data.status);
-});
+backend/
+├── src/
+│   ├── agents/              # Multi-agent system
+│   │   ├── OrchestratorAgent.ts
+│   │   ├── SecuritySpecialist.ts
+│   │   ├── AmbianceSpecialist.ts
+│   │   └── EnergySpecialist.ts
+│   ├── services/            # Core services
+│   │   ├── tuya.service.ts      # Tuya Cloud integration
+│   │   ├── LLMService.ts        # LLM integration
+│   │   ├── ContextService.ts    # Environmental context
+│   │   ├── executor.service.ts  # Legacy executor
+│   │   ├── planner.service.ts   # Legacy planner
+│   │   └── learning.service.ts  # Learning/suggestions
+│   ├── routes/              # API routes
+│   │   ├── aura.routes.ts       # New AURA endpoints
+│   │   └── plan.routes.ts       # Legacy endpoints
+│   └── index.ts             # Entry point
+├── test/                    # Tests
+└── .env.example             # Configuration template
 ```
 
-## Available Scripts
-
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | Start development server with hot reload |
-| `npm start` | Start production server |
-| `npm run build` | Compile TypeScript to JavaScript |
-| `npm test` | Run Jest tests |
-| `npm run docker:build` | Build Docker image |
-
-## Running Tests
+## Testing
 
 ```bash
 npm test
@@ -100,42 +202,22 @@ npm test
 
 ## Docker
 
-Build and run with Docker:
-
-```bash
-npm run docker:build
-docker run -p 3000:3000 -e JWT_SECRET=yoursecret aura-backend
-```
-
-Or use Docker Compose:
-
 ```bash
 docker-compose up
 ```
 
-## Frontend Integration
+## Hackathon Alignment
 
-Point your frontend to `http://localhost:3000` for API calls. Set the environment variable:
+This backend demonstrates:
 
-```
-REACT_APP_API_BASE=http://localhost:3000
-```
+1. **Cloud-Based AI Agent**: Fully cloud-orchestrated
+2. **Multi-Agent Pattern**: Orchestrator-Specialist architecture
+3. **TuyaOpen Integration**: Native Tuya Cloud API support
+4. **AI Integration**: LLM-powered intent parsing
+5. **Practical Application**: Real-world smart home scenarios
 
-## Mock Devices
+## Links
 
-The Tuya service stub includes 6 mock devices:
-- Living Room Light (light)
-- Bedroom Light (light)
-- Thermostat (thermostat)
-- Living Room TV (tv)
-- Bedroom Blinds (blinds)
-- Smart Speaker (speaker)
-
-## Available Recipes
-
-The planner recognizes these goals:
-- `goodnight` - Turn off lights, lower thermostat, close blinds
-- `movie time` - Dim lights, turn on TV, set speaker volume
-- `wake up` - Open blinds, turn on lights, raise thermostat
-
-Unrecognized goals return a `DIRECT_COMMAND` type plan.
+- [Tuya AI Innovators Hackathon](https://tuya-ai-innovators-hackathon.devpost.com/)
+- [GitHub Repository](https://github.com/lucylow/aura-smart-home-agent)
+- [Live Demo](https://tuya-aura.lovable.app/)

@@ -4,6 +4,7 @@ import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import dotenv from 'dotenv';
 import planRoutes from './routes/plan.routes';
+import auraRoutes from './routes/aura.routes';
 import { executorService } from './services/executor.service';
 import logger from './utils/logger';
 
@@ -30,6 +31,7 @@ app.use((req, res, next) => {
 
 // Routes
 app.use('/api', planRoutes);
+app.use('/api/aura', auraRoutes);
 
 // Set socket.io instance on executor service
 executorService.setSocketIO(io);
