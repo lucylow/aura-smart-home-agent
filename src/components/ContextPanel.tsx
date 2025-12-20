@@ -1,7 +1,7 @@
 // aura-project/src/components/ContextPanel.tsx
 import React from 'react';
 import { useMockContext } from '../hooks/useMockContext';
-import { Sun, CloudRain, Thermometer, Users } from 'lucide-react';
+import { Sun, CloudRain, Thermometer, Users, Clock } from 'lucide-react';
 
 export const ContextPanel: React.FC = () => {
   const context = useMockContext();
