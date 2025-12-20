@@ -102,7 +102,7 @@ const Hero = () => {
               </Button>
               <Button asChild variant="outline" size="lg" className="rounded-full gap-2 px-8 border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 dark:border-border dark:text-foreground">
                 <a href="#demo">
-                  <GitBranch className="w-5 h-5" />
+                  <GitBranch className="w-5 h-5 text-black" />
                   View Demo Video
                 </a>
               </Button>
