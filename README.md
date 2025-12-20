@@ -4,7 +4,7 @@
 **Track:** 2 - Cloud-Based AI Agent  
 **Hackathon:** Tuya AI Innovators Hackathon 2025  
 **Team:** VisionThread AI  
-**Team Members:** Alex Chen (Backend/Agent Logic), Sam Rivera (Frontend/Cloud Ops), Jordan Patel (AI/ML Integration)  
+**Team Members:** Lucy Low
 **Repository:** [https://github.com/VisionThreadAI/aura-smart-home-executive](https://github.com/VisionThreadAI/aura-smart-home-executive)  
 **Final Demo Video:** [YouTube Link](#) (With required hashtags: `#TuyaOpen #TuyaAI #HackWithTuya #TuyaHackathon #TuyaDevelopers #TuyaGlobal`)
 
