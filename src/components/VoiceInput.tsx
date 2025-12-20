@@ -41,17 +41,14 @@ export const VoiceInput: React.FC = () => {
     if (!currentPlan) return;
 
     setExecutionStatus('executing');
-    const result = await executePlan(currentPlan.planId, { enableVoiceFeedback: true });
+    const result = await executePlan(currentPlan.planId, currentPlan.steps, { enableVoiceFeedback: true });
 
     if (result.ok) {
       setExecutionStatus(result.overallStatus === 'success' ? 'completed' : 'failed');
-      // Update plan steps with execution status (mocked for now)
+      // Update plan steps with execution status
       setCurrentPlan((prev: any) => ({
         ...prev,
-        steps: prev.steps.map((step: any, index: number) => ({
-          ...step,
-          status: result.steps[index]?.status || 'completed'
-        }))
+        steps: result.steps
       }));
     } else {
       setExecutionStatus('failed');
