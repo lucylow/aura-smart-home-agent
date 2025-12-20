@@ -1,197 +1,216 @@
-// supabase/functions/aura-orchestrator/index.ts
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+/**
+ * aura-orchestrator Edge Function
+ *
+ * This function handles plan and execute operations for A.U.R.A. smart home orchestration.
+ * Currently uses mock data for demo purposes. When ready for production, set AURA_BACKEND_URL
+ * secret and uncomment the fetch calls to forward to the real backend.
+ *
+ * CORS: Allows all origins for development. Tighten in production.
+ */
 
-// --- Configuration ---
-// NOTE: BACKEND_BASE_URL should be set in Supabase environment variables
-const BACKEND_BASE_URL = Deno.env.get('BACKEND_BASE_URL') || 'http://localhost:3001';
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Content-Type': 'application/json',
 };
 
-interface AuraOrchestratorRequest {
-  mode: 'plan' | 'execute' | 'history';
-  goalText?: string;
-  planId?: string;
-  userId: string;
-  enableVoiceFeedback?: boolean;
+type AuraOrchestratorRequest =
+  | { mode: 'plan'; goalText: string; userId?: string | null; enableVoiceFeedback?: boolean }
+  | { mode: 'execute'; planId: string; userId?: string | null; enableVoiceFeedback?: boolean };
+
+type AuraPlanStep = {
+  id: string;
+  order: number;
+  specialist: 'AmbianceSpecialist' | 'SecuritySpecialist' | 'EnergySpecialist' | string;
+  description: string;
+  devices: string[];
+  status: 'pending' | 'running' | 'completed' | 'failed';
+};
+
+type AuraOrchestratorResponse =
+  | { mode: 'plan'; ok: true; planId: string; goalText: string; steps: AuraPlanStep[] }
+  | { mode: 'execute'; ok: true; planId: string; overallStatus: string; steps: AuraPlanStep[] }
+  | { ok: false; error: string };
+
+const jsonResponse = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json', ...corsHeaders },
+  });
+
+function uuidFromText(text: string) {
+  // deterministic-ish id for demo: simple hash -> hex
+  let h = 0;
+  for (let i = 0; i < text.length; i++) h = (Math.imul(31, h) + text.charCodeAt(i)) | 0;
+  return ('00000000' + (h >>> 0).toString(16)).slice(-8);
+}
+
+function buildDemoPlan(goalText: string): { planId: string; steps: AuraPlanStep[] } {
+  const baseId = uuidFromText(goalText + '|plan');
+  const lower = goalText.toLowerCase();
+
+  const possibleSteps: AuraPlanStep[] = [
+    {
+      id: `${baseId}-1`,
+      order: 1,
+      specialist: 'AmbianceSpecialist',
+      description: `Set living room lights and start ambience for: ${goalText}`,
+      devices: ['living-room-light', 'media-soundbar'],
+      status: 'pending',
+    },
+    {
+      id: `${baseId}-2`,
+      order: 2,
+      specialist: 'EnergySpecialist',
+      description: 'Ensure energy-saving modes are applied where appropriate',
+      devices: ['thermostat', 'smart-plug-tv'],
+      status: 'pending',
+    },
+    {
+      id: `${baseId}-3`,
+      order: 3,
+      specialist: 'SecuritySpecialist',
+      description: 'Lock exterior doors and arm perimeter sensors if leaving home',
+      devices: ['front-door-lock', 'back-door-lock'],
+      status: 'pending',
+    },
+  ];
+
+  // Adjust for quick scenarios
+  if (lower.includes('movie') || lower.includes('dim')) {
+    possibleSteps[0].description = `Dim lights, close blinds, set media volume for: ${goalText}`;
+    possibleSteps[0].devices = ['living-room-light', 'living-room-blinds', 'media-soundbar'];
+    possibleSteps[2].description = 'Lock front door for privacy during movie';
+    possibleSteps[2].devices = ['front-door-lock'];
+  } else if (lower.includes('goodnight') || lower.includes('sleep')) {
+    possibleSteps.unshift({
+      id: `${baseId}-0`,
+      order: 0,
+      specialist: 'AmbianceSpecialist',
+      description: 'Turn off upstairs lights and set bedroom to night mode',
+      devices: ['upstairs-lights', 'bedroom-light'],
+      status: 'pending',
+    });
+    possibleSteps[2].description = 'Set thermostat to sleep temperature (68°F)';
+  } else if (lower.includes('leaving') || lower.includes('away')) {
+    possibleSteps[1].description = 'Set thermostat to away temperature and turn off unnecessary devices';
+    possibleSteps[1].devices = ['thermostat', 'kitchen-light', 'smart-plug-coffee'];
+    possibleSteps[2].description = 'Lock all doors and arm security system';
+  } else if (lower.includes('morning') || lower.includes('wake')) {
+    possibleSteps[0].description = 'Gradually brighten lights and open blinds';
+    possibleSteps[0].devices = ['bedroom-light', 'living-room-blinds'];
+    possibleSteps[1].description = 'Set thermostat to comfort temperature and start coffee maker';
+    possibleSteps[1].devices = ['thermostat', 'smart-plug-coffee'];
+  }
+
+  // Normalize order
+  const steps = possibleSteps
+    .sort((a, b) => a.order - b.order)
+    .map((s, idx) => ({ ...s, order: idx + 1 }));
+
+  const planId = `plan-${baseId}`;
+
+  return { planId, steps };
 }
 
 serve(async (req: Request) => {
+  console.log('aura-orchestrator: Received request', req.method);
+  
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
+  if (req.method !== 'POST') {
+    return jsonResponse({ ok: false, error: 'Method not allowed, use POST' }, 405);
+  }
+
+  let body: any;
   try {
-    const payload: AuraOrchestratorRequest = await req.json();
-    
-    // Supabase client setup (using service role key for backend operations)
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
+    body = await req.json();
+    console.log('aura-orchestrator: Request body', JSON.stringify(body));
+  } catch (err) {
+    console.error('aura-orchestrator: Invalid JSON body');
+    return jsonResponse({ ok: false, error: 'Invalid JSON body' }, 400);
+  }
 
-    let response;
+  // Basic validation
+  if (!body || typeof body !== 'object' || !('mode' in body)) {
+    return jsonResponse({ ok: false, error: 'Missing or invalid "mode" field' }, 400);
+  }
 
-    switch (payload.mode) {
-      case 'plan':
-        response = await handlePlanMode(payload, supabase);
-        break;
+  const mode = body.mode as string;
 
-      case 'execute':
-        response = await handleExecuteMode(payload, supabase);
-        break;
-
-      case 'history':
-        response = await handleHistoryMode(payload, supabase);
-        break;
-
-      default:
-        return new Response(JSON.stringify({ ok: false, error: 'Unknown mode' }), {
-          status: 400,
-          headers: corsHeaders,
-        });
+  if (mode === 'plan') {
+    const { goalText } = body as AuraOrchestratorRequest & { goalText?: string };
+    if (!goalText || typeof goalText !== 'string' || goalText.trim() === '') {
+      return jsonResponse({ ok: false, error: 'Missing or empty goalText' }, 400);
     }
 
-    return new Response(JSON.stringify(response), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  } catch (err: any) {
-    console.error('Edge Function Error:', err.message);
-    return new Response(
-      JSON.stringify({ ok: false, error: err.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    console.log('aura-orchestrator: Creating plan for goal:', goalText);
+
+    // TODO: Forward to real backend when ready:
+    // const BACKEND_BASE_URL = Deno.env.get('AURA_BACKEND_URL');
+    // if (BACKEND_BASE_URL) {
+    //   const backendResponse = await fetch(`${BACKEND_BASE_URL}/plan`, { 
+    //     method: 'POST', 
+    //     headers: { 'Content-Type': 'application/json' },
+    //     body: JSON.stringify({ goalText, userId: body.userId }) 
+    //   });
+    //   const data = await backendResponse.json();
+    //   return jsonResponse(data);
+    // }
+
+    const { planId, steps } = buildDemoPlan(goalText);
+
+    const resp: AuraOrchestratorResponse = {
+      mode: 'plan',
+      ok: true,
+      planId,
+      goalText,
+      steps,
+    };
+    console.log('aura-orchestrator: Plan created', planId);
+    return jsonResponse(resp, 200);
+    
+  } else if (mode === 'execute') {
+    const { planId } = body as AuraOrchestratorRequest & { planId?: string };
+    if (!planId || typeof planId !== 'string') {
+      return jsonResponse({ ok: false, error: 'Missing or invalid planId' }, 400);
+    }
+
+    console.log('aura-orchestrator: Executing plan:', planId);
+
+    // TODO: Forward to real backend when ready:
+    // const BACKEND_BASE_URL = Deno.env.get('AURA_BACKEND_URL');
+    // if (BACKEND_BASE_URL) {
+    //   const backendResponse = await fetch(`${BACKEND_BASE_URL}/execute`, { 
+    //     method: 'POST', 
+    //     headers: { 'Content-Type': 'application/json' },
+    //     body: JSON.stringify({ planId, userId: body.userId }) 
+    //   });
+    //   const data = await backendResponse.json();
+    //   return jsonResponse(data);
+    // }
+
+    // For demo, reconstruct steps from planId (best-effort) and mark completed
+    const demoGoal = planId.replace(/^plan-/, '');
+    const { steps } = buildDemoPlan(demoGoal);
+
+    const completed = steps.map((s) => ({ ...s, status: 'completed' as const }));
+
+    const resp: AuraOrchestratorResponse = {
+      mode: 'execute',
+      ok: true,
+      planId,
+      overallStatus: 'success',
+      steps: completed,
+    };
+    console.log('aura-orchestrator: Plan executed successfully');
+    return jsonResponse(resp, 200);
+    
+  } else {
+    return jsonResponse({ ok: false, error: 'Unsupported mode. Use "plan" or "execute"' }, 400);
   }
 });
-
-async function handlePlanMode(
-  payload: AuraOrchestratorRequest,
-  supabase: any
-): Promise<any> {
-  const { goalText, userId } = payload;
-
-  // 1. Call your backend orchestrator service (Node/Bun) to generate the plan
-  const orchestratorResponse = await fetch(
-    `${BACKEND_BASE_URL}/api/aura/goal`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: goalText, userId })
-    }
-  );
-
-  if (!orchestratorResponse.ok) {
-    const errorText = await orchestratorResponse.text();
-    throw new Error(`Orchestrator service failed: ${orchestratorResponse.status} - ${errorText}`);
-  }
-
-  const { planId, steps } = await orchestratorResponse.json();
-
-  // 2. Store plan in Supabase
-  const { error } = await supabase
-    .from('plans')
-    .insert({
-      id: planId,
-      user_id: userId,
-      goal_text: goalText,
-      plan_data: { steps },
-      created_at: new Date().toISOString()
-    });
-
-  if (error) throw error;
-
-  return {
-    ok: true,
-    mode: 'plan',
-    planId,
-    goalText,
-    steps
-  };
-}
-
-async function handleExecuteMode(
-  payload: AuraOrchestratorRequest,
-  supabase: any
-): Promise<any> {
-  const { planId, userId, enableVoiceFeedback } = payload;
-
-  // 1. Call backend execution engine
-  const executionResponse = await fetch(
-    `${BACKEND_BASE_URL}/api/aura/plan/${planId}/execute`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId,
-        enableVoiceFeedback
-      })
-    }
-  );
-
-  if (!executionResponse.ok) {
-    const errorText = await executionResponse.text();
-    throw new Error(`Execution failed: ${executionResponse.status} - ${errorText}`);
-  }
-
-  const executionLog = await executionResponse.json();
-
-  // 2. Update plan record in Supabase
-  const { error: planUpdateError } = await supabase
-    .from('plans')
-    .update({
-      executed_at: new Date().toISOString(),
-      execution_count: supabase.raw('execution_count + 1')
-    })
-    .eq('id', planId);
-
-  if (planUpdateError) console.error('Error updating plan execution count:', planUpdateError);
-
-  return {
-    ok: true,
-    mode: 'execute',
-    planId,
-    overallStatus: executionLog.overallStatus,
-    steps: executionLog.steps
-  };
-}
-
-async function handleHistoryMode(
-  payload: AuraOrchestratorRequest,
-  supabase: any
-): Promise<any> {
-  const { userId } = payload;
-
-  const { data: logs, error } = await supabase
-    .from('execution_logs')
-    .select(`
-      id,
-      plan_id,
-      overall_status,
-      started_at,
-      completed_at,
-      plans(goal_text)
-    `)
-    .eq('user_id', userId)
-    .order('started_at', { ascending: false })
-    .limit(20);
-
-  if (error) throw error;
-
-  return {
-    ok: true,
-    mode: 'history',
-    logs: logs.map((log: any) => ({
-      executionId: log.id,
-      planId: log.plan_id,
-      goal: log.plans.goal_text,
-      status: log.overall_status,
-      startedAt: log.started_at,
-      completedAt: log.completed_at
-    }))
-  };
-}
