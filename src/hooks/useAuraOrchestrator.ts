@@ -1,6 +1,6 @@
 // aura-project/src/hooks/useAuraOrchestrator.ts
 import { useState, useCallback } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
 
 // Define types for the frontend to use
 interface PlanStep {
@@ -27,14 +27,8 @@ interface ExecuteResult {
   steps: any[];
 }
 
-// Initialize Supabase client (using anon key for client-side)
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
 // NOTE: In a real app, you would use the authenticated user's ID
 const MOCK_USER_ID = 'mock-user-uuid-12345';
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export const useAuraOrchestrator = () => {
   const [isLoading, setIsLoading] = useState(false);
